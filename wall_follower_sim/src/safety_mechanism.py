@@ -18,6 +18,9 @@ class SafetyMechanism:
     STOPPING_DIST = VELOCITY*0.34 + 0.3 
     SAFETY_TOPIC = "/vesc/low_level/ackermann_cmd_mux/input/safety"
     DISTANCE_TOPIC = "distance_topic"
+    DRIVE_OUT_TOPIC = "/vesc/high_level/ackermann_cmd_mux/output"
+
+    drive_cmd = AckermannDriveStamped
 
     def __init__(self):
         #init safety publisher
@@ -25,7 +28,10 @@ class SafetyMechanism:
                 
         #initialize subscriber
         self.scan_sub = rospy.Subscriber(self.SCAN_TOPIC, LaserScan, self.callback)
+        self.drive_sub = rospy.Subscriber(self.DRIVE_OUT_TOPIC, AckermannDriveStamped, self.new_drive)
 
+    def new_drive(self, drive):
+        self.drive_cmd = drive
 
     def callback(self,scan_data):
         stop, min_dist = self.stopping_mechanism(scan_data)
@@ -57,6 +63,8 @@ class SafetyMechanism:
         subset_filtered = subset[np.where(subset > 0.05)]
         min_dist = np.amin(subset_filtered)
         #check if we need to stop given subset data -- if more than 10 percet of data points are within a distance
+        if self.drive_cmd.drive.speed < 0:
+            return False, min_dist
         return np.shape(np.where(subset<=self.STOPPING_DIST))[1] > len(subset)*.10, min_dist
 
     def get_subset(self,ranges,start,end,min_angle,angle_increment):
